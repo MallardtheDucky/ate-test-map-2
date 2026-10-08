@@ -358,7 +358,7 @@
   const NO_VASSALS_COLOR = "#d4d0c2";
   const vassalExpanded = new Set();
   let vassalOnlyWith = true;
-  MODES.government = { title: "Government", key: "government", colorKey: "government_color", nameKey: "government_name" };
+  MODES.government = { title: "Government", key: "county_government", colorKey: "county_government_color", nameKey: "county_government_name" };
   MODES.empire = { title: "De jure Empire", key: "jure_empire", colorKey: "jure_empire_color", nameKey: "jure_empire_name" };
   MODES.kingdom = { title: "De jure Kingdom", key: "jure_kingdom", colorKey: "jure_kingdom_color", nameKey: "jure_kingdom_name" };
   MODES.duchy = { title: "De jure Duchy", key: "jure_duchy", colorKey: "jure_duchy_color", nameKey: "jure_duchy_name" };
@@ -931,13 +931,16 @@
     if (chain.length > 1 && !p.vassal_direct) {
       add("Liege chain", chain.join(" \u2192 "), "", ["vassal"]);
     }
-    // Government belongs to a ruler, not to a province: show the direct realm's ruler and the nation's
-    const sameGov = !p.holder_government_name || p.holder_government_name === p.government_name;
-    add(p.vassal_direct || sameGov ? "Government" : "Government (holder)", p.holder_government_name || p.government_name,
-      (p.holder_government_certain === false || (!p.holder_government_name && p.government_certain === false)) ? "(estimated)" : "",
-      p.vassal_direct || sameGov ? ["government"] : [], p.holder_government_color || p.government_color);
-    if (!p.vassal_direct && !sameGov) {
-      add("Government (nation)", p.government_name, p.government_certain === false ? "(estimated)" : "", ["government"], p.government_color);
+    // Government belongs to a ruler, not to a province: the map shows the county holder's government,
+    // like the game's own government map mode; the direct vassal's and the nation's follow when they differ.
+    const countyGov = p.county_government_name || p.holder_government_name || p.government_name;
+    const countyColor = p.county_government_color || p.holder_government_color || p.government_color;
+    add("Government", countyGov, p.county_government_certain === false ? "(estimated)" : "", ["government"], countyColor);
+    if (!p.vassal_direct && p.holder_government_name && p.holder_government_name !== countyGov) {
+      add("Government (vassal realm)", p.holder_government_name, p.holder_government_certain === false ? "(estimated)" : "", [], p.holder_government_color);
+    }
+    if (p.government_name && p.government_name !== countyGov) {
+      add("Government (nation)", p.government_name, p.government_certain === false ? "(estimated)" : "", [], p.government_color);
     }
     add("Province culture", p.culture && pretty(p.culture), "", ["culture"], p.culture_color);
     add("Province religion", p.religion && pretty(p.religion), "", ["religion"], p.religion_color);

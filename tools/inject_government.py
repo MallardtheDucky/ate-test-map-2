@@ -493,13 +493,15 @@ def main():
             realms.setdefault(vassal, top)
 
     holders_needed = {titles[t]["holder"] for t in realms if t in titles}
+    holders_needed |= {titles[f["properties"]["title"]]["holder"] for f in feature_list
+                       if f["properties"].get("title") in titles and f["properties"].get("nation_title")}
     rulers = load_rulers(history / "characters", holders_needed, cutoff)
     sea = sea_vertices(feature_list)
     feature_of = {f["properties"]["id"]: f for f in feature_list}
     colors = {name: hex_color(get(definition, "color")) for name, definition in governments}
     notes = {"no ruler data": 0, "no capital holding": 0, "uncertain": 0}
 
-    def decide(realm, nation_top, liege_merchant=None):
+    def decide(realm, nation_top, liege_merchant=None, vassal=None):
         """(government, certain, religion, culture) for the holder of `realm`."""
         entry = titles.get(realm)
         if entry is None:
@@ -537,7 +539,7 @@ def main():
             "titles": own_titles,
             "top": max(own_titles, key=lambda t: (TIERS.get(t[0], -1), t == realm)) if own_titles else realm,
             "nation_top": nation_top,
-            "vassal": realm != nation_top,
+            "vassal": (realm != nation_top) if vassal is None else vassal,
             "port": port,
             "capital_province": capital_province,
             "culture_groups": culture_groups,
@@ -566,6 +568,27 @@ def main():
         if found:
             result[realm] = found
 
+    # government of the holder of each county: this is what the game's government map mode shows
+    primary = inn.primary_titles(titles)
+    holder_cache = {}
+
+    def gov_of_holder(holder, nation_top):
+        key = (holder, nation_top)
+        if key in holder_cache:
+            return holder_cache[key]
+        holder_cache[key] = None  # guards against liege loops
+        realm = primary.get(holder)
+        if realm is None:
+            return None
+        liege_title = titles[realm]["liege"]
+        vassal, merchant = False, None
+        if liege_title and inn.is_held(titles, liege_title) and titles[liege_title]["holder"] != holder:
+            vassal = True
+            above = gov_of_holder(titles[liege_title]["holder"], nation_top)
+            merchant = bool(above and above[0] == "merchant_republic_government")
+        holder_cache[key] = decide(realm, nation_top, liege_merchant=merchant, vassal=vassal)
+        return holder_cache[key]
+
     def fill(properties, prefix, realm):
         found = result.get(realm)
         pick = found[0] if found else None
@@ -580,18 +603,29 @@ def main():
         properties = feature["properties"]
         for key in ("government", "government_name", "government_color", "government_certain",
                     "holder_government_name", "holder_government_color", "holder_government_certain",
-                    "ruler_religion", "ruler_culture", "vassal_religion", "vassal_culture"):
+                    "ruler_religion", "ruler_culture", "vassal_religion", "vassal_culture",
+                    "county_government", "county_government_name", "county_government_color",
+                    "county_government_certain", "county_holder_religion", "county_holder_culture"):
             properties[key] = None
         top = properties.get("nation_title")
         if top not in result or result[top][0] is None:
             continue
         pick = fill(properties, "", top)
-        counted[pick] = counted.get(pick, 0) + 1
         properties["ruler_religion"], properties["ruler_culture"] = result[top][2], result[top][3]
         vassal = properties.get("vassal_title") or top
         found = result.get(vassal) or result[top]
         fill(properties, "holder_", vassal if vassal in result else top)
         properties["vassal_religion"], properties["vassal_culture"] = found[2], found[3]
+        county_holder = titles.get(properties.get("title") or "", {}).get("holder")
+        own = gov_of_holder(county_holder, top) if county_holder else None
+        own = own if own and own[0] else result[top]
+        pick = own[0]
+        properties["county_government"] = pick
+        properties["county_government_name"] = names.get(pick) or clean_government_key(pick)
+        properties["county_government_color"] = colors.get(pick)
+        properties["county_government_certain"] = own[1]
+        counted[pick] = counted.get(pick, 0) + 1
+        properties["county_holder_religion"], properties["county_holder_culture"] = own[2], own[3]
 
     with open(args.out, "w", encoding="utf-8") as handle:
         json.dump(collection, handle, separators=(",", ":"))
