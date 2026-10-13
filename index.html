@@ -9,7 +9,40 @@
   html, body, #map {
     height: 100%;
     margin: 0;
-    background: #ffffff;
+    background: #0c1a28;
+  }
+  #map {
+    background:
+      radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.55) 100%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><path d='M320 0H0V320' fill='none' stroke='%23d6e8f5' stroke-opacity='.11' stroke-width='1.5'/></svg>") 0 0 / 320px 320px,
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><path d='M64 0H0V64' fill='none' stroke='%23d6e8f5' stroke-opacity='.05'/></svg>") 0 0 / 64px 64px,
+      radial-gradient(ellipse at 45% 40%, #24425c 0%, #15293d 55%, #0b1724 100%);
+  }
+  #map::before {
+    content: "";
+    position: absolute;
+    left: 28px;
+    bottom: 28px;
+    z-index: 1;
+    width: clamp(120px, 15vw, 230px);
+    aspect-ratio: 228 / 244;
+    background: url("data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%22-14 -30 228 244%22 fill=%22none%22 stroke=%22%23d6e8f5%22 stroke-linejoin=%22round%22%3E%3Ccircle cx=%22100%22 cy=%22100%22 r=%2294%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%22100%22 cy=%22100%22 r=%2280%22 stroke-width=%220.8%22 stroke-dasharray=%222 5%22/%3E%3Ccircle cx=%22100%22 cy=%22100%22 r=%2230%22 stroke-width=%220.8%22/%3E%3Cpolygon points=%22100,22 107,93 178,100 107,107 100,178 93,107 22,100 93,93%22 stroke-width=%220.8%22 fill=%22%23d6e8f5%22 fill-opacity=%220.18%22 transform=%22rotate(45 100 100)%22/%3E%3Cpolygon points=%22100,4 113,87 196,100 113,113 100,196 87,113 4,100 87,87%22 stroke-width=%221.2%22 fill=%22%23d6e8f5%22 fill-opacity=%220.32%22/%3E%3Cpath d=%22M100 4L113 87L100 100L87 87Z%22 fill=%22%23d6e8f5%22 fill-opacity=%220.55%22 stroke=%22none%22/%3E%3Cg stroke=%22none%22 fill=%22%23d6e8f5%22 font-family=%22Georgia,serif%22 font-size=%2220%22 text-anchor=%22middle%22%3E%3Ctext x=%22100%22 y=%22-6%22%3EN%3C/text%3E%3Ctext x=%22100%22 y=%22212%22%3ES%3C/text%3E%3Ctext x=%22-2%22 y=%22107%22%3EW%3C/text%3E%3Ctext x=%22202%22 y=%22107%22%3EE%3C/text%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  #map::after {
+    content: "AFTER THE END\A PROVINCE MAP";
+    position: absolute;
+    left: 28px;
+    top: 104px;
+    z-index: 1;
+    white-space: pre;
+    text-align: left;
+    font: 700 clamp(12px, 1.4vw, 20px)/1.5 Georgia, "Times New Roman", serif;
+    letter-spacing: 0.34em;
+    color: #d6e8f5;
+    opacity: 0.3;
+    pointer-events: none;
   }
   #modes {
     position: absolute;
@@ -142,58 +175,111 @@
     vertical-align: middle;
   }
   .leaflet-tooltip.pm-tip {
-    width: 310px;
-    max-width: 310px;
+    width: 350px;
+    max-width: 350px;
     padding: 0;
+    overflow: hidden;
     white-space: normal;
-    font: 13px/1.4 sans-serif;
-    color: #111111;
+    font: 13px/1.4 "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: #1b1d22;
     background: #ffffff;
-    border: 1px solid #333333;
-    border-radius: 6px;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.25);
   }
+  .leaflet-tooltip.pm-tip::before { display: none; }
   .pm-tip .head {
-    padding: 8px 12px 6px;
-    border-bottom: 1px solid #dddddd;
+    padding: 13px 16px 12px;
+    color: var(--on-accent, #ffffff);
+    background: linear-gradient(135deg, var(--accent, #555555), color-mix(in srgb, var(--accent, #555555) 60%, #000000));
   }
-  .pm-tip .head b {
-    font-size: 15px;
+  .pm-tip .title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
   }
   .pm-tip .sub {
-    font-size: 12px;
-    color: #555555;
+    margin-top: 1px;
+    font-size: 11.5px;
+    opacity: 0.85;
   }
-  .pm-tip .grid {
+  .pm-tip .sec {
+    padding: 9px 16px 5px;
+    border-top: 1px solid #eceef1;
+  }
+  .pm-tip .sec:first-of-type { border-top: none; }
+  .pm-tip .sec:last-child { padding-bottom: 11px; }
+  .pm-tip .sec-title {
+    margin-bottom: 3px;
+    font: 700 10px/1.2 "Segoe UI", system-ui, sans-serif;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8a8f98;
+  }
+  .pm-tip .line {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0 12px;
-    padding: 6px 12px 8px;
+    grid-template-columns: 96px 1fr;
+    gap: 8px;
+    margin: 0 -8px;
+    padding: 3px 8px;
+    border-radius: 7px;
   }
-  .pm-tip .k {
-    padding: 2px 0;
-    color: #666666;
-    white-space: nowrap;
+  .pm-tip .line.hl {
+    background: #f6f1dd;
+    background: color-mix(in srgb, var(--accent, #c9a227) 16%, #ffffff);
+    box-shadow: inset 3px 0 0 var(--accent, #c9a227);
   }
-  .pm-tip .v {
-    padding: 2px 0;
+  .pm-tip .lab {
+    padding-top: 2px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+  .pm-tip .val {
     font-weight: 600;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
-  .pm-tip .v small {
+  .pm-tip .val small {
     font-weight: 400;
-    color: #555555;
+    color: #6b7280;
   }
-  .pm-tip .hl {
-    background: #fff3b8;
+  .pm-tip .person {
+    display: block;
+    font-weight: 700;
   }
-  .pm-tip .sw {
+  .pm-tip .meta {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: #6b7280;
+  }
+  .pm-tip .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 2px 5px 2px 0;
+    padding: 1px 9px 1px 7px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f1f3f5;
+    border: 1px solid #e0e3e8;
+    border-radius: 999px;
+  }
+  .pm-tip .chip.plain { padding-left: 9px; }
+  .pm-tip .chip.estimated { border-style: dashed; }
+  .pm-tip .dot {
     display: inline-block;
-    width: 10px;
-    height: 10px;
-    margin-right: 5px;
-    border: 1px solid #000000;
-    vertical-align: baseline;
+    width: 9px;
+    height: 9px;
+    border: 1px solid rgba(0, 0, 0, 0.35);
+    border-radius: 50%;
+  }
+  .pm-tip .crumbs {
+    font-weight: 600;
+  }
+  .pm-tip .crumbs .sep {
+    margin: 0 4px;
+    font-weight: 400;
+    color: #9aa0a8;
   }
   #modes button.active {
     color: #ffffff;
@@ -303,6 +389,7 @@
     <button type="button" data-mode="vassal">Vassals</button>
     <button type="button" data-mode="government">Government</button>
     <button type="button" data-mode="vassalgov">Vassal Gov.</button>
+    <button type="button" data-mode="players">Players</button>
   </div>
   <div class="group" data-label="People">
     <button type="button" data-mode="culture">Culture</button>
@@ -319,13 +406,17 @@
 <div id="legend"></div>
 <script src="lib/leaflet.js"></script>
 <script src="data/provinces.js"></script>
+<script src="data/players.js" onerror="this.remove()"></script>
 <script src="data/trade_routes.js" onerror="this.remove()"></script>
 <script src="data/borders.js" onerror="this.remove()"></script>
 <script>
+  const PLAYER_SEA = "#ade7ff";
+  const PLAYER_LAND = "#ffffff";
   const UNSET_COLORS = { Sea: "#a9c4d6", Wasteland: "#d8d2c4", Unassigned: "#bdbdbd" };
   const HINTS = {
     nation: "One color per nation (the top title of a realm).",
     government: "Colored by the government of each nation's main ruler. Vassals' governments are not counted here.",
+    players: "Realms held by players. Everything else stays blank. Edit data/players.js to change who holds what.",
     vassalgov: "Colored by the government of the character holding each county, which can differ from the ruler above them (bishoprics, republics, tribes inside a feudal realm).",
     culture: "Colored by the culture of each province.",
     religion: "Colored by the religion of each province.",
@@ -361,6 +452,7 @@
   const vassalExpanded = new Set();
   let vassalOnlyWith = true;
   MODES.government = { title: "Government", key: "government", colorKey: "government_color", nameKey: "government_name" };
+  MODES.players = { title: "Players", key: "player", colorKey: "player_color", nameKey: "player_realm" };
   MODES.vassalgov = { title: "Vassal Government", key: "county_government", colorKey: "county_government_color", nameKey: "county_government_name" };
   MODES.empire = { title: "De jure Empire", key: "jure_empire", colorKey: "jure_empire_color", nameKey: "jure_empire_name" };
   MODES.kingdom = { title: "De jure Kingdom", key: "jure_kingdom", colorKey: "jure_kingdom_color", nameKey: "jure_kingdom_name" };
@@ -419,6 +511,23 @@
     return palette;
   }
 
+  const PLAYERS = window.PLAYERS_DATA || [];
+
+  function assignPlayers(features) {
+    const byTitle = {};
+    PLAYERS.forEach((entry) => (entry.titles || []).forEach((title) => {
+      byTitle[title] = entry;
+    }));
+    features.forEach((feature) => {
+      const p = feature.properties;
+      const entry = p.kind === "land" ? byTitle[p.title] || byTitle[p.vassal_title] || byTitle[p.nation_title] : null;
+      p.player = entry ? entry.realm : null;
+      p.player_realm = entry ? entry.realm : null;
+      p.player_color = entry ? entry.color : null;
+      p.player_handle = entry ? entry.player : null;
+    });
+  }
+
   function valueOf(feature, mode) {
     const value = feature.properties[MODES[mode].key];
     return value === null || value === undefined || value === "" ? null : value;
@@ -458,6 +567,9 @@
     }
     const value = valueOf(feature, currentMode);
     if (value === null) {
+      if (currentMode === "players") {
+        return feature.properties.kind === "sea" ? PLAYER_SEA : PLAYER_LAND;
+      }
       return UNSET_COLORS[unsetLabel(feature)];
     }
     return palettes[currentMode][value] || UNSET_COLORS.Unassigned;
@@ -512,7 +624,7 @@
       opacity: 1,
       fill: true,
       fillColor: fill || "#000000",
-      fillOpacity: fill ? 0.8 : 0
+      fillOpacity: fill ? (currentMode === "players" ? 0.95 : 0.8) : 0
     };
   }
 
@@ -541,6 +653,7 @@
     const modeCounts = counts[currentMode];
     const needle = filterText.trim().toLowerCase();
     const entries = Object.keys(modeCounts)
+      .filter((value) => currentMode !== "players" || palettes.players[value])
       .filter((value) => !needle || labelOf(currentMode, value).toLowerCase().includes(needle))
       .sort((a, b) => (UNSET_COLORS[a] && !palettes[currentMode][a] ? 1 : 0) - (UNSET_COLORS[b] && !palettes[currentMode][b] ? 1 : 0) ||
         modeCounts[b] - modeCounts[a] || labelOf(currentMode, a).localeCompare(labelOf(currentMode, b)));
@@ -902,87 +1015,175 @@
     return String(text).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
+  function luminance(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const channel = (v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
+  }
+
+  const HOLDING_ICONS = { castle: "\u{1F3F0}", city: "\u{1F3D9}\uFE0F", temple: "\u26EA", tribal: "\u26FA" };
+
   function tooltipFor(p) {
-    const box = document.createElement("div");
-    const head = document.createElement("div");
-    head.className = "head";
-    const name = document.createElement("b");
-    name.textContent = p.name;
-    head.appendChild(name);
-    const sub = document.createElement("div");
-    sub.className = "sub";
-    sub.textContent = "Province #" + p.id + (p.kind === "sea" ? " \u00b7 Sea zone" : p.kind === "wasteland" ? " \u00b7 Wasteland, no ruler" : "");
-    head.appendChild(sub);
+    const el = (tag, cls, text) => {
+      const node = document.createElement(tag);
+      if (cls) {
+        node.className = cls;
+      }
+      if (text !== undefined && text !== null) {
+        node.textContent = text;
+      }
+      return node;
+    };
+    const box = el("div", "card");
+    const accent = palettes.nation[p.nation_title] || p.realm_color || "#5b6470";
+    const light = /^#[0-9a-f]{6}$/i.test(accent) && luminance(accent) > 0.45;
+    box.style.setProperty("--accent", accent);
+    box.style.setProperty("--on-accent", light ? "#1b1d22" : "#ffffff");
+
+    const head = el("div", "head");
+    head.appendChild(el("div", "title", p.name));
+    head.appendChild(el("div", "sub", "Province #" + p.id + (p.kind === "sea" ? " \u00b7 Sea zone" : p.kind === "wasteland" ? " \u00b7 Wasteland, no ruler" : p.nation ? " \u00b7 " + p.nation : "")));
     box.appendChild(head);
     if (p.kind === "sea" || p.kind === "wasteland") {
       return box;
     }
 
-    const rows = [];
-    const add = (label, value, note, modes, color) => {
-      if (value) {
-        rows.push({ label, value, note, modes: modes || [], color });
+    const section = (title) => {
+      const node = el("div", "sec");
+      node.appendChild(el("div", "sec-title", title));
+      box.appendChild(node);
+      return node;
+    };
+    const line = (parent, label, modes) => {
+      const row = el("div", "line" + (modes && modes.includes(currentMode) ? " hl" : ""));
+      row.appendChild(el("div", "lab", label));
+      const value = el("div", "val");
+      row.appendChild(value);
+      parent.appendChild(row);
+      return value;
+    };
+    const chip = (parent, text, color, estimated) => {
+      const node = el("span", "chip" + (color ? "" : " plain") + (estimated ? " estimated" : ""));
+      if (color) {
+        const dot = el("i", "dot");
+        dot.style.background = color;
+        node.appendChild(dot);
+      }
+      node.appendChild(document.createTextNode(text + (estimated ? " (estimated)" : "")));
+      parent.appendChild(node);
+    };
+    const note = (parent, text) => {
+      if (text) {
+        parent.appendChild(document.createTextNode(" "));
+        parent.appendChild(el("small", null, text));
       }
     };
-    add("Nation", p.nation, p.nation_rank ? "(" + p.nation_rank + ")" : "", ["nation"], palettes.nation[p.nation_title]);
+    const person = (parent, name, capital) => {
+      parent.appendChild(el("span", "person", name));
+      if (capital) {
+        parent.appendChild(el("span", "meta", "Capital: " + capital));
+      }
+    };
+
+    if (p.player_realm) {
+      const sec = section("Player");
+      const row = line(sec, "Realm", ["players"]);
+      chip(row, p.player_realm, p.player_color);
+      if (p.player_handle) {
+        row.appendChild(el("span", "meta", p.player_handle));
+      }
+    }
+
+    const realm = section("Realm");
+    const nation = line(realm, "Nation", ["nation"]);
+    chip(nation, p.nation, palettes.nation[p.nation_title]);
+    note(nation, p.nation_rank);
+    const held = line(realm, "Held by", ["vassal"]);
     if (p.vassal_direct) {
-      add("Held by", "The nation's ruler directly", "", ["vassal"]);
+      held.appendChild(document.createTextNode("The nation's ruler directly"));
     } else {
-      add("Held by", p.vassal, p.vassal_rank ? "(vassal " + p.vassal_rank + ")" : "", ["vassal"], palettes.vassal[p.vassal_title]);
+      chip(held, p.vassal, palettes.vassal[p.vassal_title]);
+      note(held, p.vassal_rank ? "vassal " + p.vassal_rank : "");
     }
     const chain = (p.liege_chain || "").split(" > ").filter(Boolean);
     if (chain.length > 1 && !p.vassal_direct) {
-      add("Liege chain", chain.join(" \u2192 "), "", ["vassal"]);
+      const crumbs = line(realm, "Liege chain", ["vassal"]);
+      crumbs.className += " crumbs";
+      chain.forEach((name, index) => {
+        if (index) {
+          crumbs.appendChild(el("span", "sep", "\u2192"));
+        }
+        crumbs.appendChild(document.createTextNode(name));
+      });
     }
-    add("Ruler", p.ruler_name, p.ruler_capital ? "(capital " + p.ruler_capital + ")" : "", ["government", "nation"]);
-    add("Government", p.government_name, p.government_certain === false ? "(estimated)" : "", ["government"], p.government_color);
-    if (!p.vassal_direct && p.vassal_ruler_name) {
-      add("Vassal realm ruler", p.vassal_ruler_name, p.holder_government_name ? "(" + p.holder_government_name + ")" : "", ["vassal"]);
+
+    if (p.ruler_name || p.vassal_ruler_name || p.county_holder_name) {
+      const people = section("People & government");
+      if (p.ruler_name) {
+        const ruler = line(people, "Ruler", ["government", "nation"]);
+        person(ruler, p.ruler_name, p.ruler_capital);
+        if (p.government_name) {
+          chip(ruler, p.government_name, p.government_color, p.government_certain === false);
+        }
+      }
+      if (!p.vassal_direct && p.vassal_ruler_name) {
+        const vassalRuler = line(people, "Vassal realm", ["vassal"]);
+        person(vassalRuler, p.vassal_ruler_name, null);
+        if (p.holder_government_name) {
+          chip(vassalRuler, p.holder_government_name, p.holder_government_color, p.holder_government_certain === false);
+        }
+      }
+      if (p.county_holder_name) {
+        const holder = line(people, "County holder", ["vassalgov"]);
+        person(holder, p.county_holder_name, p.county_holder_capital);
+        if (p.county_government_name) {
+          chip(holder, p.county_government_name, p.county_government_color, p.county_government_certain === false);
+        }
+      }
     }
-    if (p.county_holder_name) {
-      add("County holder", p.county_holder_name, p.county_holder_capital ? "(capital " + p.county_holder_capital + ")" : "", ["vassalgov"]);
+
+    const land = section("Province");
+    if (p.culture) {
+      chip(line(land, "Culture", ["culture"]), pretty(p.culture), p.culture_color);
     }
-    add("Vassal government", p.county_government_name, p.county_government_certain === false ? "(estimated)" : "", ["vassalgov"], p.county_government_color);
-    add("Province culture", p.culture && pretty(p.culture), "", ["culture"], p.culture_color);
-    add("Province religion", p.religion && pretty(p.religion), "", ["religion"], p.religion_color);
+    if (p.religion) {
+      const religion = line(land, "Religion", ["religion"]);
+      chip(religion, pretty(p.religion), p.religion_color);
+    }
     if (p.ruler_religion && p.ruler_religion !== p.religion) {
-      add("Ruler's religion", pretty(p.ruler_religion), p.ruler_culture ? "(" + pretty(p.ruler_culture) + ")" : "", []);
+      const rulerFaith = line(land, "Ruler's faith", []);
+      chip(rulerFaith, pretty(p.ruler_religion));
+      if (p.ruler_culture) {
+        chip(rulerFaith, pretty(p.ruler_culture));
+      }
     }
     const jure = [p.jure_empire_name, p.jure_kingdom_name, p.jure_duchy_name].filter(Boolean);
     if (jure.length) {
-      add("De jure", jure.join(" \u203a "), "", ["empire", "kingdom", "duchy", "county"]);
+      const crumbs = line(land, "De jure", ["empire", "kingdom", "duchy", "county"]);
+      crumbs.className += " crumbs";
+      jure.forEach((name, index) => {
+        if (index) {
+          crumbs.appendChild(el("span", "sep", "\u203a"));
+        }
+        crumbs.appendChild(document.createTextNode(name));
+      });
     }
     if (p.baronies) {
       const list = p.baronies.split("; ");
-      const shown = list.slice(0, 8).join(", ");
-      add(list.length === 1 ? "Barony" : "Baronies", shown + (list.length > 8 ? " +" + (list.length - 8) + " more" : ""), "");
+      const barony = line(land, list.length === 1 ? "Barony" : "Baronies", []);
+      list.slice(0, 8).forEach((entry) => {
+        const match = entry.match(/^(.*) \((\w+)\)$/);
+        const text = match ? match[1] : entry;
+        const icon = match ? HOLDING_ICONS[match[2]] || "" : "";
+        chip(barony, (icon ? icon + " " : "") + text, null);
+      });
+      if (list.length > 8) {
+        barony.appendChild(el("small", null, "+" + (list.length - 8) + " more"));
+      }
     }
-
-    const grid = document.createElement("div");
-    grid.className = "grid";
-    rows.forEach((row) => {
-      const hl = row.modes.includes(currentMode) ? " hl" : "";
-      const k = document.createElement("div");
-      k.className = "k" + hl;
-      k.textContent = row.label;
-      const v = document.createElement("div");
-      v.className = "v" + hl;
-      if (row.color) {
-        const sw = document.createElement("span");
-        sw.className = "sw";
-        sw.style.background = row.color;
-        v.appendChild(sw);
-      }
-      v.appendChild(document.createTextNode(row.value));
-      if (row.note) {
-        const small = document.createElement("small");
-        small.textContent = " " + row.note;
-        v.appendChild(small);
-      }
-      grid.appendChild(k);
-      grid.appendChild(v);
-    });
-    box.appendChild(grid);
     return box;
   }
 
@@ -997,6 +1198,7 @@
   if (!data) {
     document.getElementById("map").textContent = "data/provinces.js is missing or failed to load";
   } else {
+    assignPlayers(data.features);
     Object.keys(MODES).forEach((mode) => {
       const values = [];
       counts[mode] = {};
@@ -1020,6 +1222,12 @@
       palettes[mode] = buildPalette(values);
       // official game colors win; values without one keep the generated color
       Object.assign(palettes[mode], officialColors[mode]);
+    });
+    PLAYERS.forEach((entry) => {
+      palettes.players[entry.realm] = entry.color;
+      counts.players[entry.realm] = counts.players[entry.realm] || 0;
+      valueNames.players = valueNames.players || {};
+      valueNames.players[entry.realm] = entry.realm;
     });
 
     buildVassalInfo();
@@ -1064,7 +1272,23 @@
       });
     }
 
-    map.fitBounds(provinceLayer.getBounds());
+    const mapBounds = provinceLayer.getBounds();
+    L.rectangle(mapBounds, { pane: "tilePane", interactive: false, color: "#000000", weight: 2, fillColor: "#ffffff", fillOpacity: 1 }).addTo(map);
+    let userMoved = false;
+    const fitAll = () => map.fitBounds(mapBounds, { paddingTopLeft: [12, 92], paddingBottomRight: [12, 12], animate: false });
+    fitAll();
+    map.on("dragstart", () => {
+      userMoved = true;
+    });
+    map.getContainer().addEventListener("wheel", () => {
+      userMoved = true;
+    }, { passive: true });
+    window.addEventListener("resize", () => {
+      if (!userMoved) {
+        map.invalidateSize();
+        fitAll();
+      }
+    });
     setMode("nation");
   }
 </script>
