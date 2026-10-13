@@ -1,26 +1,4 @@
-"""Add a government type to every province's nation.
 
-CK2 does not store government in the history files: the game picks it from the ruler's
-capital holding (castle, city, temple, tribal) and then checks each government's
-`potential` trigger in common/governments. This script redoes that pick for the ruler of
-each nation on the nation date:
-
-  1. the ruler is the holder of the nation's top title (history/titles)
-  2. the ruler's religion, culture and sex come from history/characters
-  3. the capital province is the top title's `capital =` in landed_titles (or the first
-     capital found below it), and its capital holding is the first holding in that county's province history file
-  3b. a holder of a title with `historical_nomad = yes` (history/titles) is Nomadic
-  4. governments whose preferred_holdings include that holding type are tried in file
-     order, and the first whose potential trigger is not false wins
-
-Triggers the history files cannot answer (controls_religion, religion features, who is a
-patrician, ...) count as "unknown": a government that only depends on unknowns can still
-win, but is reported as uncertain in `government_certain`.
-
-Usage (from the tools folder), after inject_nations.py:
-  python inject_government.py --geojson provinces_nations.geojson --common path/to/common \\
-      --history path/to/history --localisation path/to/localisation --out provinces_gov.geojson
-"""
 import argparse
 import csv
 import json
@@ -42,17 +20,12 @@ FALLBACK = {
 }
 TITLE_KEY = re.compile(r"^[bcdke]_")
 
-
 def pairs_of(path):
     pairs, _ = ih.parse_block(ih.tokenize(ih.read_text(path)), 0)
     return pairs
 
-
-# ---------------------------------------------------------------- landed titles
-
-
 def load_title_tree(folder):
-    """{title: {"capital": province id or None, "children": [titles in file order]}}"""
+
     tree = {}
 
     def walk(pairs, parent):
@@ -64,7 +37,7 @@ def load_title_tree(folder):
                     if k == "capital" and isinstance(v, str) and v.isdigit():
                         capital = int(v)
                     elif k == "controls_religion" and isinstance(v, str):
-                        head_of = v  # holding this title means controlling that religion
+                        head_of = v
                 tree[key] = {"capital": capital, "children": [], "head_of": head_of}
                 if parent is not None:
                     tree[parent]["children"].append(key)
@@ -73,7 +46,6 @@ def load_title_tree(folder):
     for path in sorted(folder.glob("*.txt")):
         walk(pairs_of(path), None)
     return tree
-
 
 def first_capital(tree, title, seen=None):
     seen = seen or set()
@@ -88,12 +60,8 @@ def first_capital(tree, title, seen=None):
             return found
     return None
 
-
-# ------------------------------------------------------------- province history
-
-
 def load_province_holdings(folder):
-    """{province id: (county title, [(barony, holding type), ...] in file order)}"""
+
     out = {}
     for path in sorted(folder.glob("*.txt")):
         match = re.match(r"\s*(\d+)", path.name)
@@ -109,19 +77,37 @@ def load_province_holdings(folder):
         out[int(match.group(1))] = (county, baronies)
     return out
 
-
-def capital_holding(tree, holdings, province_of_county, county):
-    """Holding type of the county's capital: the first holding listed in the province history file
-    (checked against the game: the Holy Columbian Confederacy is Feudal because Charleston lists a castle first)."""
+def capital_holding(holdings, province_of_county, titles, county, holder):
     province = province_of_county.get(county)
     if province is None:
         return None
     _, baronies = holdings[province]
-    types = dict(baronies)
-    return baronies[0][1] if baronies else None
+    for barony, holding in baronies:
+        entry = titles.get(barony)
+        if entry is not None and inn.is_held(titles, barony) and entry["holder"] != holder:
+            continue
+        return holding
+    return None
 
 
-# -------------------------------------------------------------------- religions
+def resolve_capital(own_titles, primary_title, ruler, tree, holdings, province_of_county, title_order):
+    held = sorted((t for t in own_titles if t[0] == "c" and t in province_of_county),
+                  key=lambda t: title_order.get(t, 10 ** 9))
+    explicit = ruler.get("capital") if ruler else None
+    if explicit and explicit in province_of_county:
+        return explicit, "explicit", held
+    ordered = sorted(own_titles, key=lambda t: (-TIERS.get(t[0], -1), t != primary_title, title_order.get(t, 10 ** 9)))
+    for title in ordered:
+        if title[0] == "c":
+            county = title if title in province_of_county else None
+        else:
+            capital = first_capital(tree, title)
+            county = holdings[capital][0] if capital in holdings else None
+        if county and county in held:
+            return county, "title", held
+    if held:
+        return held[0], "fallback", held
+    return None, "none", held
 
 
 def load_religion_groups(folder):
@@ -135,12 +121,8 @@ def load_religion_groups(folder):
                     groups[name] = group
     return groups
 
-
-# ----------------------------------------------------------- religion settings
-
-
 def load_temple_rules(folder):
-    """{religion: (male_temple_holders, female_temple_holders)}. CK2 defaults: men yes, women no."""
+
     rules = {}
     for path in sorted(folder.glob("*.txt")):
         for group, block in pairs_of(path):
@@ -152,12 +134,8 @@ def load_temple_rules(folder):
                     rules[name] = (male != "no", female == "yes")
     return rules
 
-
-# ------------------------------------------------------------ cultures, regions
-
-
 def load_culture_groups(folder):
-    """{culture: culture group} from common/cultures (a culture has male_names or color)."""
+
     groups = {}
     for path in sorted(folder.glob("*.txt")):
         for group, block in pairs_of(path):
@@ -168,9 +146,8 @@ def load_culture_groups(folder):
                     groups[name] = group
     return groups
 
-
 def load_regions(path, tree, province_of_county):
-    """{region: set of province ids} from map/geographical_region.txt (duchies, counties, provinces, sub-regions)."""
+
     regions = {}
     for name, block in pairs_of(path):
         if not name or not isinstance(block, list):
@@ -193,12 +170,8 @@ def load_regions(path, tree, province_of_county):
         regions[name] = provinces
     return regions
 
-
-# ------------------------------------------------------------------- characters
-
-
 def load_rulers(folder, holders, cutoff):
-    """{character id: {"religion", "culture", "female"}} for the ids in `holders`."""
+
     rulers = {}
     for path in sorted(folder.glob("*.txt")):
         for key, block in pairs_of(path):
@@ -206,16 +179,33 @@ def load_rulers(folder, holders, cutoff):
                 rulers[key] = {
                     "religion": inn.latest(block, "religion", cutoff),
                     "culture": inn.latest(block, "culture", cutoff),
+                    "capital": inn.latest(block, "capital", cutoff),
+                    "name": next((v for k, v in block if k == "name" and isinstance(v, str)), None),
+                    "dynasty": next((v for k, v in block if k == "dynasty" and isinstance(v, str)), None),
                     "female": any(k == "female" and v == "yes" for k, v in block),
                 }
     return rulers
 
+def load_dynasties(folder):
+    names = {}
+    for path in sorted(folder.glob("*.txt")):
+        for key, block in pairs_of(path):
+            if key and isinstance(block, list):
+                name = next((v for k, v in block if k == "name" and isinstance(v, str)), None)
+                if name:
+                    names[key] = name
+    return names
 
-# ------------------------------------------------------------------- governments
+
+def full_name(ruler, dynasties):
+    if not ruler or not ruler.get("name"):
+        return None
+    dynasty = dynasties.get(ruler.get("dynasty")) if ruler.get("dynasty") else None
+    return f"{ruler['name']} {dynasty}" if dynasty else ruler["name"]
 
 
 def load_governments(folder):
-    """[(name, definition pairs)] in file order, files sorted by name."""
+
     out = []
     for path in sorted(folder.glob("*.txt")):
         for _, block in pairs_of(path):
@@ -225,22 +215,20 @@ def load_governments(folder):
                         out.append((name, definition))
     return out
 
-
 def get(block, key):
     for k, v in block:
         if k == key:
             return v
     return None
 
-
 class Evaluator:
-    """Three-valued trigger evaluation: True, False, or None when it cannot be known."""
 
-    def __init__(self, governments, groups, ctx):
+    def __init__(self, governments, groups, ctx, unknown=None):
         self.defs = dict(governments)
         self.groups = groups
         self.ctx = ctx
         self.active = set()
+        self.unknown = unknown if unknown is not None else set()
 
     def potential(self, name):
         definition = self.defs.get(name)
@@ -281,11 +269,11 @@ class Evaluator:
             return self.lor(values)
         if mode == "NOR":
             return self.lnot(self.lor(values))
-        return self.lnot(self.land(values))  # NAND
+        return self.lnot(self.land(values))
 
     @staticmethod
     def boolean(known, value):
-        """`known` is the true state (True/False/None); `value` is the yes/no in the script."""
+
         if known is None:
             return None
         return known == (value == "yes")
@@ -309,15 +297,14 @@ class Evaluator:
         if key == "region":
             return None if value not in ctx["regions"] or ctx["capital_province"] is None else ctx["capital_province"] in ctx["regions"][value]
         if key in ("has_religion_feature", "has_selected_religion_feature"):
-            return False  # features are chosen by reformation in play; no religion has one when the game starts
+            return False
         if key == "has_religion_features":
-            return self.boolean(True, value)  # Holy Fury religion features are in use
+            return self.boolean(True, value)
         if key == "character":
-            return False  # `NOT = { character = PREV }`: a liege is never the character itself
+            return False
         if key == "is_merchant_republic":
             return self.boolean(ctx["liege_merchant"], value)
         if key == "liege_before_war":
-            # the liege before any war is the nation's ruler for a direct vassal; a nation's ruler has none
             return self.block(value, "AND") if ctx["vassal"] and isinstance(value, list) else False
         if key in ("religion_allows_female_temple_holders", "religion_allows_male_temple_holders"):
             rule = ctx["temple_rules"].get(ctx["religion"])
@@ -325,7 +312,7 @@ class Evaluator:
                 return None
             return self.boolean(rule[1] if "female" in key else rule[0], value)
         if key == "has_title_flag":
-            return False  # title flags are only set by in-game events and decisions, never at game start
+            return False
         if key == "is_theocracy":
             return self.boolean(ctx["theocracy"], value)
         if key == "is_government_potential":
@@ -339,7 +326,6 @@ class Evaluator:
         if key == "primary_title" and isinstance(value, list):
             return self.block(value, "AND")
         if key == "top_liege" and isinstance(value, list):
-            # a nation's ruler is their own top liege; a vassal's top liege is the nation's ruler
             outer = self.ctx
             self.ctx = dict(outer, top=outer["nation_top"], vassal=False)
             try:
@@ -363,18 +349,13 @@ class Evaluator:
         if key == "any_demesne_province":
             return True
         if key == "has_game_started":
-            return value == "no"  # history is read as the game starts
+            return value == "no"
         if key == "is_save_game":
             return value == "no"
         if key in ("is_patrician", "holy_order", "mercenary", "is_offmap_tag"):
             return value == "no" if key != "is_offmap_tag" else False
-        # has_religion_feature(s), is_merchant_republic, is_feudal,
-        # liege_before_war, has_law, holding_type, ... cannot be told from the history files
+        self.unknown.add(key)
         return None
-
-
-# ---------------------------------------------------------------------- the rest
-
 
 def hex_color(block):
     numbers = [v for k, v in (block or []) if k is None and isinstance(v, str)]
@@ -388,7 +369,6 @@ def hex_color(block):
         values = [v * 255 for v in values]
     return "#%02x%02x%02x" % tuple(max(0, min(255, round(v))) for v in values)
 
-
 def load_government_names(folder):
     names = {}
     for path in sorted(folder.glob("*.csv")):
@@ -400,11 +380,9 @@ def load_government_names(folder):
                     names.setdefault("military_governorate", row[1].strip())
     return names
 
-
 def clean_government_key(key):
     words = re.sub(r"_government$", "", key).replace("_", " ").split()
     return " ".join(w[:1].upper() + w[1:] for w in words) or key
-
 
 def sea_vertices(features):
     seen = set()
@@ -415,7 +393,6 @@ def sea_vertices(features):
             seen.update((round(x, 2), round(y, 2)) for x, y in ring)
     return seen
 
-
 def rings(geometry):
     if geometry["type"] == "Polygon":
         return geometry["coordinates"]
@@ -423,10 +400,8 @@ def rings(geometry):
         return [ring for polygon in geometry["coordinates"] for ring in polygon]
     return []
 
-
 def is_port(feature, sea):
     return any((round(x, 2), round(y, 2)) in sea for ring in rings(feature["geometry"]) for x, y in ring)
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -471,7 +446,6 @@ def main():
         if inn.latest(pairs_of(path), "historical_nomad", cutoff) == "yes":
             nomad_titles.add(path.stem)
 
-    nomad_titles_all = nomad_titles
     feature_list = collection["features"]
     counties_of = {}
     for feature in feature_list:
@@ -479,7 +453,7 @@ def main():
         if top and county:
             counties_of.setdefault(top, []).append(county)
 
-    realms = {}  # realm title -> nation top title (nations and their direct vassals)
+    realms = {}
     for feature in feature_list:
         properties = feature["properties"]
         top = properties.get("nation_title")
@@ -492,54 +466,37 @@ def main():
         elif vassal:
             realms.setdefault(vassal, top)
 
-    holders_needed = {titles[t]["holder"] for t in realms if t in titles}
-    holders_needed |= {titles[f["properties"]["title"]]["holder"] for f in feature_list
-                       if f["properties"].get("title") in titles and f["properties"].get("nation_title")}
-    rulers = load_rulers(history / "characters", holders_needed, cutoff)
+    every_holder = {entry["holder"] for entry in titles.values() if entry["holder"] not in (None, "0")}
+    rulers = load_rulers(history / "characters", every_holder, cutoff)
+    dynasties = load_dynasties(common / "dynasties")
     sea = sea_vertices(feature_list)
     feature_of = {f["properties"]["id"]: f for f in feature_list}
     colors = {name: hex_color(get(definition, "color")) for name, definition in governments}
-    notes = {"no ruler data": 0, "no capital holding": 0, "uncertain": 0}
+    county_names = inn.load_names(Path(args.localisation))
+    primary = inn.primary_titles(titles)
+    title_order = {title: index for index, title in enumerate(tree)}
+    unknown_keys = set()
+    stats = {"capital basis": {}, "no ruler data": [], "no capital holding": [], "uncertain": [], "ambiguous capital": []}
 
-    def decide(realm, nation_top, liege_merchant=None, vassal=None):
-        """(government, certain, religion, culture) for the holder of `realm`."""
-        entry = titles.get(realm)
-        if entry is None:
-            return None
-        holder = entry["holder"]
-        ruler = rulers.get(holder)
-        religion = ruler["religion"] if ruler else None
-        culture = ruler["culture"] if ruler else None
-        own_titles = held_by.get(holder, {realm})
-        if nomad_titles_all & set(own_titles):
-            return ("nomadic_government", True, religion, culture)
-        capital = first_capital(tree, realm)
-        county = (holdings.get(capital) or (None,))[0] if capital else None
-        if county is None and realm[0] == "c":
-            county = realm
-        if county is None:
-            own = [c for c in counties_of.get(nation_top, []) if titles.get(c, {}).get("holder") == holder]
-            county = (own or counties_of.get(nation_top, [None]))[0]
-        holding = capital_holding(tree, holdings, province_of_county, county) if county else None
-        if ruler is None:
-            notes["no ruler data"] += 1
+    def evaluate(holder, ruler, own_titles, primary_title, county, nation_top, vassal, liege_merchant):
+        holding = capital_holding(holdings, province_of_county, titles, county, holder)
         if holding is None:
-            notes["no capital holding"] += 1
-            return (None, False, religion, culture)
+            return None
+        religion = ruler["religion"] if ruler else None
         capital_province = province_of_county.get(county)
         port = is_port(feature_of[capital_province], sea) if capital_province in feature_of else None
         controls = None if religion is None else any(tree.get(t, {}).get("head_of") == religion for t in own_titles)
-        tier = max((TIERS[t[0]] for t in own_titles if t[0] in TIERS), default=TIERS[realm[0]])
+        tier = max((TIERS[t[0]] for t in own_titles if t[0] in TIERS), default=TIERS[primary_title[0]])
         ctx = {
             "controls": controls,
             "religion": religion,
-            "culture": culture,
+            "culture": ruler["culture"] if ruler else None,
             "female": ruler["female"] if ruler else None,
             "tier": tier,
             "titles": own_titles,
-            "top": max(own_titles, key=lambda t: (TIERS.get(t[0], -1), t == realm)) if own_titles else realm,
+            "top": primary_title,
             "nation_top": nation_top,
-            "vassal": (realm != nation_top) if vassal is None else vassal,
+            "vassal": vassal,
             "port": port,
             "capital_province": capital_province,
             "culture_groups": culture_groups,
@@ -548,96 +505,173 @@ def main():
             "temple_rules": temple_rules,
             "liege_merchant": liege_merchant,
         }
-        evaluator = Evaluator(governments, groups, ctx)
+        evaluator = Evaluator(governments, groups, ctx, unknown_keys)
         wanted = HOLDING_FOR[holding]
         order = [name for name, definition in governments if wanted in [v for k, v in (get(definition, "preferred_holdings") or [])]]
         verdicts = [(name, evaluator.potential(name)) for name in order]
-        pick = next((name for name, ok in verdicts if ok is True), None)
-        certain = pick is not None
-        if pick is None:
-            pick = next((name for name, ok in verdicts if ok is None), None)
-        if pick is None:
-            pick = FALLBACK[wanted]
+        first = next(((name, ok) for name, ok in verdicts if ok is not False), None)
+        if first is None:
+            return (FALLBACK[wanted], False, [name for name, ok in verdicts])
+        return (first[0], first[1] is True, [name for name, ok in verdicts if ok is None])
+
+    decided = {}
+
+    def decide(holder, nation_top, vassal, liege_merchant):
+        key = (holder, nation_top, vassal, liege_merchant)
+        if key in decided:
+            return decided[key]
+        decided[key] = None
+        ruler = rulers.get(holder)
+        religion = ruler["religion"] if ruler else None
+        culture = ruler["culture"] if ruler else None
+        own_titles = held_by.get(holder, set())
+        primary_title = primary.get(holder)
+        if ruler is None:
+            stats["no ruler data"].append(holder)
+        if not own_titles or primary_title is None:
+            return None
+        if nomad_titles & own_titles:
+            decided[key] = {"government": "nomadic_government", "certain": True, "religion": religion,
+                            "culture": culture, "capital": None, "basis": "nomad title", "person": full_name(ruler, dynasties)}
+            return decided[key]
+        county, basis, held_counties = resolve_capital(own_titles, primary_title, ruler, tree, holdings, province_of_county, title_order)
+        if county is None:
+            stats["no capital holding"].append((holder, primary_title))
+            decided[key] = {"government": None, "certain": False, "religion": religion, "culture": culture,
+                            "capital": None, "basis": basis, "person": full_name(ruler, dynasties)}
+            return decided[key]
+        outcome = evaluate(holder, ruler, own_titles, primary_title, county, nation_top, vassal, liege_merchant)
+        if outcome is None:
+            stats["no capital holding"].append((holder, county))
+            decided[key] = {"government": None, "certain": False, "religion": religion, "culture": culture,
+                            "capital": county, "basis": basis, "person": full_name(ruler, dynasties)}
+            return decided[key]
+        pick, certain, unresolved = outcome
+        if basis == "fallback" and len(held_counties) > 1:
+            alternatives = {}
+            for other in held_counties:
+                other_outcome = evaluate(holder, ruler, own_titles, primary_title, other, nation_top, vassal, liege_merchant)
+                alternatives[other] = other_outcome[0] if other_outcome else None
+            if len(set(alternatives.values())) > 1:
+                certain = False
+                stats["ambiguous capital"].append((holder, primary_title, alternatives))
         if not certain:
-            notes["uncertain"] += 1
-        return (pick, certain, religion, culture)
+            stats["uncertain"].append((holder, primary_title, pick, unresolved))
+        stats["capital basis"][basis] = stats["capital basis"].get(basis, 0) + 1
+        decided[key] = {"government": pick, "certain": certain, "religion": religion, "culture": culture,
+                        "capital": county, "basis": basis, "person": full_name(ruler, dynasties)}
+        return decided[key]
+
+    realms = {}
+    for feature in feature_list:
+        properties = feature["properties"]
+        top = properties.get("nation_title")
+        if not top:
+            continue
+        realms.setdefault(top, top)
+        vassal_title = properties.get("vassal_title")
+        if vassal_title:
+            realms.setdefault(vassal_title, top)
 
     result = {}
-    for realm, top in sorted(realms.items(), key=lambda i: (i[0] != i[1], i[0])):  # nations first
-        found = decide(realm, top, liege_merchant=None if realm == top else (result.get(top, (None,))[0] == "merchant_republic_government"))
+    for realm, top in sorted(realms.items(), key=lambda i: (i[0] != i[1], i[0])):
+        entry = titles.get(realm)
+        if entry is None:
+            continue
+        merchant = None if realm == top else bool(result.get(top) and result[top]["government"] == "merchant_republic_government")
+        found = decide(entry["holder"], top, realm != top, merchant)
         if found:
             result[realm] = found
 
-    # government of the holder of each county: this is what the game's government map mode shows
-    primary = inn.primary_titles(titles)
-    holder_cache = {}
-
-    def gov_of_holder(holder, nation_top):
-        key = (holder, nation_top)
-        if key in holder_cache:
-            return holder_cache[key]
-        holder_cache[key] = None  # guards against liege loops
+    def gov_of_holder(holder, nation_top, trail=()):
         realm = primary.get(holder)
-        if realm is None:
+        if realm is None or holder in trail:
             return None
         liege_title = titles[realm]["liege"]
         vassal, merchant = False, None
         if liege_title and inn.is_held(titles, liege_title) and titles[liege_title]["holder"] != holder:
             vassal = True
-            above = gov_of_holder(titles[liege_title]["holder"], nation_top)
-            merchant = bool(above and above[0] == "merchant_republic_government")
-        holder_cache[key] = decide(realm, nation_top, liege_merchant=merchant, vassal=vassal)
-        return holder_cache[key]
+            above = gov_of_holder(titles[liege_title]["holder"], nation_top, trail + (holder,))
+            merchant = bool(above and above["government"] == "merchant_republic_government")
+        return decide(holder, nation_top, vassal, merchant)
 
-    def fill(properties, prefix, realm):
-        found = result.get(realm)
-        pick = found[0] if found else None
+    def capital_label(info):
+        county = info.get("capital") if info else None
+        if not county:
+            return None
+        name, _ = inn.display_name(county, county_names)
+        return name
+
+    def fill(properties, prefix, found):
+        pick = found["government"] if found else None
         properties[prefix + "government"] = pick
         properties[prefix + "government_name"] = (names.get(pick) or clean_government_key(pick)) if pick else None
         properties[prefix + "government_color"] = colors.get(pick) if pick else None
-        properties[prefix + "government_certain"] = found[1] if found else None
-        return pick
+        properties[prefix + "government_certain"] = found["certain"] if found else None
 
+    reset_keys = ("government", "government_name", "government_color", "government_certain",
+                  "holder_government", "holder_government_name", "holder_government_color", "holder_government_certain",
+                  "ruler_religion", "ruler_culture", "ruler_capital", "ruler_capital_basis",
+                  "vassal_religion", "vassal_culture",
+                  "county_government", "county_government_name", "county_government_color",
+                  "county_government_certain", "county_holder_religion", "county_holder_culture",
+                  "county_holder_capital", "county_holder_capital_basis",
+                  "ruler_name", "vassal_ruler_name", "county_holder_name")
     counted = {}
+    missing = []
     for feature in feature_list:
         properties = feature["properties"]
-        for key in ("government", "government_name", "government_color", "government_certain",
-                    "holder_government_name", "holder_government_color", "holder_government_certain",
-                    "ruler_religion", "ruler_culture", "vassal_religion", "vassal_culture",
-                    "county_government", "county_government_name", "county_government_color",
-                    "county_government_certain", "county_holder_religion", "county_holder_culture"):
+        for key in reset_keys:
             properties[key] = None
         top = properties.get("nation_title")
-        if top not in result or result[top][0] is None:
+        if top not in result or result[top]["government"] is None:
+            if top:
+                missing.append((properties.get("id"), properties.get("title"), top))
             continue
-        pick = fill(properties, "", top)
-        properties["ruler_religion"], properties["ruler_culture"] = result[top][2], result[top][3]
-        vassal = properties.get("vassal_title") or top
-        found = result.get(vassal) or result[top]
-        fill(properties, "holder_", vassal if vassal in result else top)
-        properties["vassal_religion"], properties["vassal_culture"] = found[2], found[3]
+        ruler_info = result[top]
+        fill(properties, "", ruler_info)
+        properties["ruler_religion"], properties["ruler_culture"] = ruler_info["religion"], ruler_info["culture"]
+        properties["ruler_capital"], properties["ruler_capital_basis"] = capital_label(ruler_info), ruler_info["basis"]
+        properties["ruler_name"] = ruler_info["person"]
+        vassal_title = properties.get("vassal_title") or top
+        vassal_info = result.get(vassal_title) or ruler_info
+        fill(properties, "holder_", vassal_info)
+        properties["vassal_religion"], properties["vassal_culture"] = vassal_info["religion"], vassal_info["culture"]
+        properties["vassal_ruler_name"] = vassal_info["person"]
         county_holder = titles.get(properties.get("title") or "", {}).get("holder")
         own = gov_of_holder(county_holder, top) if county_holder else None
-        own = own if own and own[0] else result[top]
-        pick = own[0]
-        properties["county_government"] = pick
-        properties["county_government_name"] = names.get(pick) or clean_government_key(pick)
-        properties["county_government_color"] = colors.get(pick)
-        properties["county_government_certain"] = own[1]
-        counted[pick] = counted.get(pick, 0) + 1
-        properties["county_holder_religion"], properties["county_holder_culture"] = own[2], own[3]
+        if not own or not own["government"]:
+            missing.append((properties.get("id"), properties.get("title"), "county holder"))
+            continue
+        fill(properties, "county_", own)
+        properties["county_holder_religion"], properties["county_holder_culture"] = own["religion"], own["culture"]
+        properties["county_holder_capital"], properties["county_holder_capital_basis"] = capital_label(own), own["basis"]
+        properties["county_holder_name"] = own["person"]
+        counted[own["government"]] = counted.get(own["government"], 0) + 1
 
     with open(args.out, "w", encoding="utf-8") as handle:
         json.dump(collection, handle, separators=(",", ":"))
 
     by_nation = {}
     for top in {f["properties"].get("nation_title") for f in feature_list}:
-        if top in result and result[top][0]:
-            by_nation[result[top][0]] = by_nation.get(result[top][0], 0) + 1
-    print(f"governments for {len(by_nation and sum(by_nation.values()) and result)} realms (nations and direct vassals) on {date}")
+        if top in result and result[top]["government"]:
+            by_nation[result[top]["government"]] = by_nation.get(result[top]["government"], 0) + 1
+    print(f"governments for {len(result)} realms (nations and direct vassals) on {date}")
     print("nations: " + ", ".join(f"{n} {g}" for g, n in sorted(by_nation.items(), key=lambda i: -i[1])))
-    print("provinces: " + ", ".join(f"{n} {g}" for g, n in sorted(counted.items(), key=lambda i: -i[1])))
-    print(f"{notes['uncertain']} realms decided with unknown triggers, {notes['no ruler data']} rulers not found in history/characters, {notes['no capital holding']} realms with no capital holding")
+    print("county holders: " + ", ".join(f"{n} {g}" for g, n in sorted(counted.items(), key=lambda i: -i[1])))
+    print("capital resolved by: " + ", ".join(f"{k} {v}" for k, v in sorted(stats["capital basis"].items())))
+    print(f"rulers not found in history/characters: {len(stats['no ruler data'])}")
+    print(f"realms or holders with no capital holding: {len(stats['no capital holding'])}")
+    print(f"triggers the script could not evaluate: {sorted(unknown_keys) or 'none'}")
+    print(f"decisions that are not certain: {len(stats['uncertain'])}")
+    for holder, title, pick, unresolved in stats["uncertain"][:40]:
+        print(f"  {holder} {title} -> {pick}; unresolved: {unresolved}")
+    print(f"holders whose capital had to be guessed between counties that give different governments: {len(stats['ambiguous capital'])}")
+    for holder, title, alternatives in stats["ambiguous capital"][:60]:
+        print(f"  {holder} {title}: " + ", ".join(f"{c}={g}" for c, g in alternatives.items()))
+    print(f"provinces left without a government: {len(missing)}")
+    for item in missing[:20]:
+        print(f"  {item}")
     print(f"wrote {args.out}")
 
 

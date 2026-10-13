@@ -302,6 +302,7 @@
     <button type="button" data-mode="nation">Nation</button>
     <button type="button" data-mode="vassal">Vassals</button>
     <button type="button" data-mode="government">Government</button>
+    <button type="button" data-mode="vassalgov">Vassal Gov.</button>
   </div>
   <div class="group" data-label="People">
     <button type="button" data-mode="culture">Culture</button>
@@ -324,7 +325,8 @@
   const UNSET_COLORS = { Sea: "#a9c4d6", Wasteland: "#d8d2c4", Unassigned: "#bdbdbd" };
   const HINTS = {
     nation: "One color per nation (the top title of a realm).",
-    government: "Colored by the government type of each nation's ruler.",
+    government: "Colored by the government of each nation's main ruler. Vassals' governments are not counted here.",
+    vassalgov: "Colored by the government of the character holding each county, which can differ from the ruler above them (bishoprics, republics, tribes inside a feudal realm).",
     culture: "Colored by the culture of each province.",
     religion: "Colored by the religion of each province.",
     empire: "Historic (de jure) empires, whoever rules them today.",
@@ -358,7 +360,8 @@
   const NO_VASSALS_COLOR = "#d4d0c2";
   const vassalExpanded = new Set();
   let vassalOnlyWith = true;
-  MODES.government = { title: "Government", key: "county_government", colorKey: "county_government_color", nameKey: "county_government_name" };
+  MODES.government = { title: "Government", key: "government", colorKey: "government_color", nameKey: "government_name" };
+  MODES.vassalgov = { title: "Vassal Government", key: "county_government", colorKey: "county_government_color", nameKey: "county_government_name" };
   MODES.empire = { title: "De jure Empire", key: "jure_empire", colorKey: "jure_empire_color", nameKey: "jure_empire_name" };
   MODES.kingdom = { title: "De jure Kingdom", key: "jure_kingdom", colorKey: "jure_kingdom_color", nameKey: "jure_kingdom_name" };
   MODES.duchy = { title: "De jure Duchy", key: "jure_duchy", colorKey: "jure_duchy_color", nameKey: "jure_duchy_name" };
@@ -931,17 +934,15 @@
     if (chain.length > 1 && !p.vassal_direct) {
       add("Liege chain", chain.join(" \u2192 "), "", ["vassal"]);
     }
-    // Government belongs to a ruler, not to a province: the map shows the county holder's government,
-    // like the game's own government map mode; the direct vassal's and the nation's follow when they differ.
-    const countyGov = p.county_government_name || p.holder_government_name || p.government_name;
-    const countyColor = p.county_government_color || p.holder_government_color || p.government_color;
-    add("Government", countyGov, p.county_government_certain === false ? "(estimated)" : "", ["government"], countyColor);
-    if (!p.vassal_direct && p.holder_government_name && p.holder_government_name !== countyGov) {
-      add("Government (vassal realm)", p.holder_government_name, p.holder_government_certain === false ? "(estimated)" : "", [], p.holder_government_color);
+    add("Ruler", p.ruler_name, p.ruler_capital ? "(capital " + p.ruler_capital + ")" : "", ["government", "nation"]);
+    add("Government", p.government_name, p.government_certain === false ? "(estimated)" : "", ["government"], p.government_color);
+    if (!p.vassal_direct && p.vassal_ruler_name) {
+      add("Vassal realm ruler", p.vassal_ruler_name, p.holder_government_name ? "(" + p.holder_government_name + ")" : "", ["vassal"]);
     }
-    if (p.government_name && p.government_name !== countyGov) {
-      add("Government (nation)", p.government_name, p.government_certain === false ? "(estimated)" : "", [], p.government_color);
+    if (p.county_holder_name) {
+      add("County holder", p.county_holder_name, p.county_holder_capital ? "(capital " + p.county_holder_capital + ")" : "", ["vassalgov"]);
     }
+    add("Vassal government", p.county_government_name, p.county_government_certain === false ? "(estimated)" : "", ["vassalgov"], p.county_government_color);
     add("Province culture", p.culture && pretty(p.culture), "", ["culture"], p.culture_color);
     add("Province religion", p.religion && pretty(p.religion), "", ["religion"], p.religion_color);
     if (p.ruler_religion && p.ruler_religion !== p.religion) {
